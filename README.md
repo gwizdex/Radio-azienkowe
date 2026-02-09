@@ -18,16 +18,27 @@ Stacje radiowe można znależć tu: https://fmstream.org/
 
 Ustawienia Arduino: 
 Board: "ESP32S3 Dev Module"
+
 USB CDC On Boot: "Enabled"
+
 CPU Frequency: "240MHz (WiFi)"
+
 Flash Mode: "QIO 80MHz"
+
 Flash Size: "16MB (128Mb)"
+
 Partition Scheme: "16M Flash (3MB APP/9.9MB FATFS)"
+
 PSRAM: "OPI PSRAM"
+
 Upload Mode: "UART0 / Hardware CDC"
+
 Upload Speed: "921600"
+
 USB Mode: "Hardware CDC and JTAG"
+
 Core Debug Level: "None"
+
 
 
 This is a bathroom radio project.<img width="112" height="77" alt="obraz" src="https://github.com/user-attachments/assets/85d266f2-89bc-47e9-a971-574fa8c852a2" />
