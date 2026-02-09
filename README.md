@@ -1,6 +1,6 @@
 # Radio-łazienkowe
 
-Jesto to projekt radia do łązienki. 
+Jesto to projekt radia do łązienki. <img width="101" height="69" alt="obraz" src="https://github.com/user-attachments/assets/56c87561-6b80-47ea-a032-c84eab18e1a0" />
 
 Oparty jest o płytkę ESP32-S3 WROOM-1 N16R8 oraz MAX98357A i czujnik światła BH1750. Głośnik jaki został użyty to 4Ω głośnik do pracy w saunach.
 Zasada działania: Czujnik oświetlenia wykrywa wartość powyżej ustawinego progu i rozpoczyna odtwarzania strumienia audio ze wcześnie zdefiniowanego adresu.
@@ -13,7 +13,8 @@ Przy pierwszym uruchomieniu uruchamia się tryb AP, szukany sieci o nazwie: "Rad
 Po uzyskaniu połączenia otrzymamy komunikat głosowy o uzyskanym dresie IP w dwóch językach polskim i angielskim.
 Stacje radiowe można znależć tu: https://fmstream.org/
 
-This is a bathroom radio project.
+This is a bathroom radio project.<img width="112" height="77" alt="obraz" src="https://github.com/user-attachments/assets/85d266f2-89bc-47e9-a971-574fa8c852a2" />
+
 
 It's based on the ESP32-S3 WROOM-1 N16R8 board, the MAX98357A, and the BH1750 light sensor. The speaker used is a 4Ω speaker suitable for saunas.
 
@@ -28,6 +29,12 @@ We can also change the WiFi network. To enter service mode, enter the password: 
 When you first turn it on, it launches AP mode, searches for a network named "Radio_Config" and enters the password: "password123."
 Once connected, you'll receive a voice message announcing the IP address you've acquired, in both Polish and English.
 Radio stations can be found here: https://fmstream.org/
+
+
+<img width="364" height="768" alt="obraz" src="https://github.com/user-attachments/assets/1b45c4a7-7a9e-4599-965d-3c1414bb8b17" />
+<img width="311" height="330" alt="obraz" src="https://github.com/user-attachments/assets/81fc124d-c8ea-4546-96f1-82c82b3038e2" />
+<img width="339" height="482" alt="obraz" src="https://github.com/user-attachments/assets/202bf12d-0967-467e-8f24-0e9e915ae188" />
+<img width="682" height="560" alt="obraz" src="https://github.com/user-attachments/assets/150a7881-c7fb-4bcb-83f1-071366da3fd1" />
 
 <img width="827" height="1235" alt="obraz" src="https://github.com/user-attachments/assets/cd736d84-6096-4187-96a0-e043e82894fe" />
 <img width="829" height="1034" alt="obraz" src="https://github.com/user-attachments/assets/2e6fe498-be6a-48a3-bd96-93f422fcb6f6" />
