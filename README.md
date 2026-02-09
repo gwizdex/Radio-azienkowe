@@ -12,7 +12,7 @@ Wszystkie wartości są zapamiętywane i obowiązują po restarcie.
 Mamy również do dyspozycji tryb serwisowy, który daje nam możliwość edycji GPIO według własnych upodobań, dodanie czujnika DHT22 i możliwość współpracy z Mqtt.
 
 Mamy również możliwość zmiany sieci WiFi. Do trybu serwisowego trzeba wpisać hasło: "jolka"
-Przy pierwszym uruchomieniu uruchamia się tryb AP, szukany sieci o nazwie: "Radio_Config" i hasło: "password123"
+Przy pierwszym uruchomieniu uruchamia się tryb AP, szukamy sieci o nazwie: "Radio_Config" i hasło: "password123"
 Po uzyskaniu połączenia otrzymamy komunikat głosowy o uzyskanym dresie IP w dwóch językach polskim i angielskim.
 Stacje radiowe można znależć tu: https://fmstream.org/
 
