@@ -16,6 +16,20 @@ Przy pierwszym uruchomieniu uruchamia się tryb AP, szukamy sieci o nazwie: "Rad
 Po uzyskaniu połączenia otrzymamy komunikat głosowy o uzyskanym dresie IP w dwóch językach polskim i angielskim.
 Stacje radiowe można znależć tu: https://fmstream.org/
 
+Ustawienia Arduino: 
+Board: "ESP32S3 Dev Module"
+USB CDC On Boot: "Enabled"
+CPU Frequency: "240MHz (WiFi)"
+Flash Mode: "QIO 80MHz"
+Flash Size: "16MB (128Mb)"
+Partition Scheme: "16M Flash (3MB APP/9.9MB FATFS)"
+PSRAM: "OPI PSRAM"
+Upload Mode: "UART0 / Hardware CDC"
+Upload Speed: "921600"
+USB Mode: "Hardware CDC and JTAG"
+Core Debug Level: "None"
+
+
 This is a bathroom radio project.<img width="112" height="77" alt="obraz" src="https://github.com/user-attachments/assets/85d266f2-89bc-47e9-a971-574fa8c852a2" />
 
 
@@ -33,6 +47,18 @@ When you first turn it on, it launches AP mode, searches for a network named "Ra
 Once connected, you'll receive a voice message announcing the IP address you've acquired, in both Polish and English.
 Radio stations can be found here: https://fmstream.org/
 
+Arduino settings:
+Board: "ESP32S3 Dev Module"
+USB CDC On Boot: "Enabled"
+CPU Frequency: "240MHz (WiFi)"
+Flash Mode: "QIO 80MHz"
+Flash Size: "16MB (128Mb)"
+Partition Scheme: "16M Flash (3MB APP/9.9MB FATFS)"
+PSRAM: "OPI PSRAM"
+Upload Mode: "UART0 / Hardware CDC"
+Upload Speed: "921600"
+USB Mode: "Hardware CDC and JTAG"
+Core Debug Level: "None"
 
 <img width="364" height="768" alt="obraz" src="https://github.com/user-attachments/assets/1b45c4a7-7a9e-4599-965d-3c1414bb8b17" />
 <img width="311" height="330" alt="obraz" src="https://github.com/user-attachments/assets/81fc124d-c8ea-4546-96f1-82c82b3038e2" />
