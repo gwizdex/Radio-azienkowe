@@ -64,6 +64,7 @@ Core Debug Level: "None"
 <img width="311" height="330" alt="obraz" src="https://github.com/user-attachments/assets/81fc124d-c8ea-4546-96f1-82c82b3038e2" />
 <img width="339" height="482" alt="obraz" src="https://github.com/user-attachments/assets/202bf12d-0967-467e-8f24-0e9e915ae188" />
 <img width="682" height="560" alt="obraz" src="https://github.com/user-attachments/assets/150a7881-c7fb-4bcb-83f1-071366da3fd1" />
+<img width="2235" height="1111" alt="obraz" src="https://github.com/user-attachments/assets/2ad1d452-2292-4b51-93e3-e3e8a1839517" />
 
 <img width="827" height="1235" alt="obraz" src="https://github.com/user-attachments/assets/cd736d84-6096-4187-96a0-e043e82894fe" />
 <img width="829" height="1034" alt="obraz" src="https://github.com/user-attachments/assets/2e6fe498-be6a-48a3-bd96-93f422fcb6f6" />
