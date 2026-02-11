@@ -1,6 +1,6 @@
 # Radio-łazienkowe
 
-Jesto to projekt radia do łązienki. <img width="101" height="69" alt="obraz" src="https://github.com/user-attachments/assets/56c87561-6b80-47ea-a032-c84eab18e1a0" />
+Jesto to projekt radia do łazienki. <img width="101" height="69" alt="obraz" src="https://github.com/user-attachments/assets/56c87561-6b80-47ea-a032-c84eab18e1a0" />
 
 Oparty jest o płytkę ESP32-S3 WROOM-1 N16R8 oraz MAX98357A i czujnik światła BH1750. Głośnik jaki został użyty to 4Ω głośnik do pracy w saunach.
 
