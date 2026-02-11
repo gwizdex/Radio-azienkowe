@@ -63,6 +63,7 @@ int scheduleStartHour = 6;
 int scheduleStartMinute = 0;
 int scheduleEndHour = 23;
 int scheduleEndMinute = 59;
+bool SCHEDULE_ENABLED = true;  // ⭐ NOWE!
 
 struct RadioStation {
   String name;
@@ -98,54 +99,53 @@ String urlEncode(String str) {
 volatile bool isSpeaking = false;
 
 void speak(String text, int volume = 21) {
-  // Google TTS API URL
   String ttsURL = "http://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=pl&q=" + 
                   urlEncode(text);
   
   Serial.println("Speaking: " + text);
   
-  isSpeaking = true; // BLOKADA!
+  isSpeaking = true;
   
   int previousVolume = currentVolume;
   audio.setVolume(volume);
   audio.connecttohost(ttsURL.c_str());
   
-  // Czekaj aż audio się zakończy
   unsigned long startTime = millis();
-  unsigned long timeout = text.length() * 100 + 5000; // 100ms na znak + 5s marginesu
+  unsigned long timeout = text.length() * 100 + 5000;
   
   while (audio.isRunning() && (millis() - startTime < timeout)) {
-    audio.loop(); // Ważne! Musimy wywołać loop() tutaj
+    audio.loop();
     delay(10);
   }
   
   audio.stopSong();
-  delay(500); // Krótka przerwa
+  delay(500);
   
   audio.setVolume(previousVolume);
   
-  isSpeaking = false; // ODBLOKOWANIE
+  isSpeaking = false;
   
   Serial.println("Speaking finished");
 }
 
 void speakIP(String ip) {
-  // Zamień kropki na "kropka" dla lepszej wymowy
+  // POLSKI - tylko zamiana kropek
   String ipTextPL = ip;
   ipTextPL.replace(".", " kropka ");
   
-  String ipTextEN = ip;
-  ipTextEN.replace(".", " dot ");
-  
-  // POLSKI
   String messagePL = "Połączono. Adres I P: " + ipTextPL;
   speak(messagePL, 5);
   
-  delay(1000); // Krótka przerwa między językami
+  delay(1000);
   
-  // ANGIELSKI
+  // ANGIELSKI - tylko zamiana kropek
+  String ipTextEN = ip;
+  ipTextEN.replace(".", " dot ");
+  
+  String messageEN = "Connected. I P address: " + ipTextEN;
+  
   String ttsURL = "http://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=" + 
-                  urlEncode("Connected. I P address: " + ipTextEN);
+                  urlEncode(messageEN);
   
   Serial.println("Speaking (EN): Connected. IP address: " + ip);
   
@@ -156,7 +156,7 @@ void speakIP(String ip) {
   audio.connecttohost(ttsURL.c_str());
   
   unsigned long startTime = millis();
-  unsigned long timeout = 10000; // 10s max
+  unsigned long timeout = 10000;
   
   while (audio.isRunning() && (millis() - startTime < timeout)) {
     audio.loop();
@@ -214,7 +214,7 @@ void saveMQTT() {
   preferences.putString("mqtt_prefix", MQTT_TOPIC_PREFIX);
 }
 
-void mqttCallback(char* topic, byte* payload, unsigned int length) {
+void mqttCallback(char* topic, uint8_t* payload, unsigned int length) {
   String message = "";
   for (unsigned int i = 0; i < length; i++) {
     message += (char)payload[i];
@@ -395,6 +395,7 @@ void loadSettings() {
   scheduleStartMinute = preferences.getInt("schedStartM", 0);
   scheduleEndHour = preferences.getInt("schedEndH", 23);
   scheduleEndMinute = preferences.getInt("schedEndM", 59);
+  SCHEDULE_ENABLED = preferences.getBool("schedEnabled", true);  // ⭐ NOWE!
 }
 
 void saveSettings() {
@@ -405,9 +406,15 @@ void saveSettings() {
   preferences.putInt("schedStartM", scheduleStartMinute);
   preferences.putInt("schedEndH", scheduleEndHour);
   preferences.putInt("schedEndM", scheduleEndMinute);
+  preferences.putBool("schedEnabled", SCHEDULE_ENABLED);  // ⭐ NOWE!
 }
 
 bool isWithinSchedule() {
+  // ⭐ NOWE - Jeśli harmonogram wyłączony, zawsze zwracaj TRUE
+  if (!SCHEDULE_ENABLED) {
+    return true;
+  }
+  
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
     Serial.println("Failed to obtain time");
@@ -492,8 +499,8 @@ const char index_html[] PROGMEM = R"rawliteral(
     .station-url { font-size: 12px; color: #666; word-break: break-all; }
     .btn-small { padding: 5px 15px; font-size: 14px; width: auto; margin: 0 5px; }
     .setting-group { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0; }
-    .inline-control { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
-    .inline-control label { margin: 0; flex: 1; }
+    .inline-control { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; margin: 10px 0; }
+    .inline-control label { margin: 0; }
     .inline-control input { flex: 0 0 100px; }
     .time-range { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; margin: 10px 0; }
     .time-range input { flex: 1; }
@@ -506,6 +513,12 @@ const char index_html[] PROGMEM = R"rawliteral(
     .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; }
     .dht-display { display: none; }
     .dht-display.visible { display: block; }
+    .toggle-switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: #28a745; }
+    input:checked + .slider:before { transform: translateX(26px); }
   </style>
 </head>
 <body>
@@ -551,6 +564,13 @@ const char index_html[] PROGMEM = R"rawliteral(
 
     <h2>🕐 <span data-lang-key="schedule-title">Harmonogram</span></h2>
     <div class="setting-group">
+      <div class="inline-control">
+        <label><span data-lang-key="schedule-enable">Włącz harmonogram</span>:</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="schedule_enabled" onchange="toggleSchedule()">
+          <span class="slider"></span>
+        </label>
+      </div>
       <label><span data-lang-key="active-period">Przedział aktywności</span>:</label>
       <div class="time-range">
         <input type="time" id="scheduleStart" value="06:00">
@@ -611,6 +631,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         'station-select': 'Wybór stacji',
         volume: 'Głośność',
         'schedule-title': 'Harmonogram',
+        'schedule-enable': 'Włącz harmonogram',
         'active-period': 'Przedział aktywności',
         to: 'do',
         'save-schedule': 'Zapisz harmonogram',
@@ -646,6 +667,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         'station-select': 'Select station',
         volume: 'Volume',
         'schedule-title': 'Schedule',
+        'schedule-enable': 'Enable schedule',
         'active-period': 'Active period',
         to: 'to',
         'save-schedule': 'Save schedule',
@@ -793,6 +815,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         document.getElementById('delayOff').value = d.delayOff;
         document.getElementById('scheduleStart').value = d.scheduleStart;
         document.getElementById('scheduleEnd').value = d.scheduleEnd;
+        document.getElementById('schedule_enabled').checked = d.scheduleEnabled;
       });
     };
     
@@ -824,11 +847,17 @@ const char index_html[] PROGMEM = R"rawliteral(
       var off = document.getElementById('delayOff').value;
       var start = document.getElementById('scheduleStart').value;
       var end = document.getElementById('scheduleEnd').value;
-      fetch('/savesettings?threshold='+t+'&delayOn='+on+'&delayOff='+off+'&schedStart='+encodeURIComponent(start)+'&schedEnd='+encodeURIComponent(end))
+      var schedEnabled = document.getElementById('schedule_enabled').checked ? '1' : '0';
+      
+      fetch('/savesettings?threshold='+t+'&delayOn='+on+'&delayOff='+off+'&schedStart='+encodeURIComponent(start)+'&schedEnd='+encodeURIComponent(end)+'&schedEnabled='+schedEnabled)
       .then(function(r){return r.text();}).then(function(res){
         var msg = res==='OK' ? (currentLang==='pl' ? 'Ustawienia zapisane!' : 'Settings saved!') : (currentLang==='pl' ? 'Błąd!' : 'Error!');
         alert(msg);
       });
+    };
+
+    var toggleSchedule = function() {
+      saveSettings();
     };
 
     var addStation = function() {
@@ -1374,6 +1403,7 @@ void handleReset() {
   MQTT_USER = "";
   MQTT_PASS = "";
   MQTT_TOPIC_PREFIX = "bathroom_radio";
+  SCHEDULE_ENABLED = true;
   brightnessThreshold = 10.0;
   delayOn = 1;
   delayOff = 1;
@@ -1435,7 +1465,8 @@ void handleSettings() {
   json += "\"delayOn\":" + String(delayOn) + ",";
   json += "\"delayOff\":" + String(delayOff) + ",";
   json += "\"scheduleStart\":\"" + String(startTime) + "\",";
-  json += "\"scheduleEnd\":\"" + String(endTime) + "\"";
+  json += "\"scheduleEnd\":\"" + String(endTime) + "\",";
+  json += "\"scheduleEnabled\":" + String(SCHEDULE_ENABLED ? "true" : "false");  // ⭐ NOWE!
   json += "}";
   server.send(200, "application/json", json);
 }
@@ -1457,6 +1488,10 @@ void handleSaveSettings() {
   if (server.hasArg("schedEnd")) {
     String end = server.arg("schedEnd");
     sscanf(end.c_str(), "%d:%d", &scheduleEndHour, &scheduleEndMinute);
+  }
+  // ⭐ NOWE!
+  if (server.hasArg("schedEnabled")) {
+    SCHEDULE_ENABLED = (server.arg("schedEnabled") == "1");
   }
   
   saveSettings();
@@ -1600,7 +1635,6 @@ void setup() {
   if (!wifiManager.autoConnect("Radio_Config", "password123")) {
     Serial.println("Failed to connect, restarting...");
     
-    // 🎤 Komunikat głosowy o błędzie
     speak("Nie udało się połączyć z siecią. Urządzenie się restartuje.", 21);
     
     delay(3000);
