@@ -8,6 +8,7 @@
 #include <time.h>
 #include <DHT.h>
 #include <PubSubClient.h>
+#include <ESPmDNS.h>
 
 // Piny - konfigurowane przez użytkownika
 int SDA_PIN = 8;
@@ -63,7 +64,7 @@ int scheduleStartHour = 6;
 int scheduleStartMinute = 0;
 int scheduleEndHour = 23;
 int scheduleEndMinute = 59;
-bool SCHEDULE_ENABLED = true;  // ⭐ NOWE!
+bool SCHEDULE_ENABLED = true;
 
 struct RadioStation {
   String name;
@@ -395,7 +396,7 @@ void loadSettings() {
   scheduleStartMinute = preferences.getInt("schedStartM", 0);
   scheduleEndHour = preferences.getInt("schedEndH", 23);
   scheduleEndMinute = preferences.getInt("schedEndM", 59);
-  SCHEDULE_ENABLED = preferences.getBool("schedEnabled", true);  // ⭐ NOWE!
+  SCHEDULE_ENABLED = preferences.getBool("schedEnabled", true);
 }
 
 void saveSettings() {
@@ -406,11 +407,11 @@ void saveSettings() {
   preferences.putInt("schedStartM", scheduleStartMinute);
   preferences.putInt("schedEndH", scheduleEndHour);
   preferences.putInt("schedEndM", scheduleEndMinute);
-  preferences.putBool("schedEnabled", SCHEDULE_ENABLED);  // ⭐ NOWE!
+  preferences.putBool("schedEnabled", SCHEDULE_ENABLED);
 }
 
 bool isWithinSchedule() {
-  // ⭐ NOWE - Jeśli harmonogram wyłączony, zawsze zwracaj TRUE
+  // Jeśli harmonogram wyłączony, zawsze zwracaj TRUE
   if (!SCHEDULE_ENABLED) {
     return true;
   }
@@ -433,16 +434,32 @@ bool isWithinSchedule() {
 }
 
 float readBH1750() {
+  // Sprawdź czy czujnik odpowiada
   Wire.beginTransmission(BH1750_ADDR);
   Wire.write(0x10);
-  Wire.endTransmission();
+  uint8_t error = Wire.endTransmission();
+  
+  if (error != 0) {
+    // Czujnik nie odpowiada - zwróć 0 (ciemno, nie włączaj radia)
+    return 0;
+  }
+  
   delay(120);
   
   Wire.requestFrom(BH1750_ADDR, 2);
+  
+  // Timeout na odczyt - nie blokuj loop()
+  unsigned long timeout = millis();
+  while (Wire.available() < 2 && (millis() - timeout < 100)) {
+    delay(1);
+  }
+  
   if (Wire.available() == 2) {
     uint16_t value = Wire.read() << 8 | Wire.read();
     return value / 1.2;
   }
+  
+  // Brak danych - czujnik nie odpowiada
   return 0;
 }
 
@@ -904,6 +921,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 </body>
 </html>
 )rawliteral";
+
 const char service_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -1466,7 +1484,7 @@ void handleSettings() {
   json += "\"delayOff\":" + String(delayOff) + ",";
   json += "\"scheduleStart\":\"" + String(startTime) + "\",";
   json += "\"scheduleEnd\":\"" + String(endTime) + "\",";
-  json += "\"scheduleEnabled\":" + String(SCHEDULE_ENABLED ? "true" : "false");  // ⭐ NOWE!
+  json += "\"scheduleEnabled\":" + String(SCHEDULE_ENABLED ? "true" : "false");
   json += "}";
   server.send(200, "application/json", json);
 }
@@ -1489,7 +1507,6 @@ void handleSaveSettings() {
     String end = server.arg("schedEnd");
     sscanf(end.c_str(), "%d:%d", &scheduleEndHour, &scheduleEndMinute);
   }
-  // ⭐ NOWE!
   if (server.hasArg("schedEnabled")) {
     SCHEDULE_ENABLED = (server.arg("schedEnabled") == "1");
   }
@@ -1595,6 +1612,7 @@ void handleVolume() {
   }
   server.send(200, "text/plain", "OK");
 }
+
 void setup() {
   Serial.begin(115200);
   delay(2000);
@@ -1609,6 +1627,15 @@ void setup() {
   
   Wire.begin(SDA_PIN, SCL_PIN);
   Serial.println("I2C initialized on SDA:" + String(SDA_PIN) + " SCL:" + String(SCL_PIN));
+  
+  // Test obecności BH1750
+  Wire.beginTransmission(BH1750_ADDR);
+  uint8_t bh1750_error = Wire.endTransmission();
+  if (bh1750_error == 0) {
+    Serial.println("BH1750 sensor detected!");
+  } else {
+    Serial.println("WARNING: BH1750 not connected. Auto mode will not work until sensor is connected.");
+  }
   
   initDHT();
   
@@ -1629,6 +1656,9 @@ void setup() {
   audio.setVolume(currentVolume);
   Serial.println("Audio initialized!");
   
+  // ⭐ Ustaw hostname PRZED połączeniem WiFi
+  WiFi.setHostname("Radio-Lazienka");
+  
   WiFiManager wifiManager;
   wifiManager.setConfigPortalTimeout(180);
   
@@ -1648,6 +1678,15 @@ void setup() {
   Serial.println(WiFi.SSID());
   Serial.print("RSSI: ");
   Serial.println(WiFi.RSSI());
+  
+  // ⭐ mDNS
+  if (MDNS.begin("radio-lazienka")) {
+    Serial.println("mDNS started!");
+    Serial.println("Access via: http://radio-lazienka.local");
+    MDNS.addService("http", "tcp", 80);
+  } else {
+    Serial.println("Error starting mDNS");
+  }
   
   // 🎤🎤🎤 KOMUNIKAT GŁOSOWY Z ADRESEM IP! 🎤🎤🎤
   String ipAddress = WiFi.localIP().toString();
@@ -1691,6 +1730,7 @@ void setup() {
   Serial.println("=== READY ===");
   Serial.print("Web interface: http://");
   Serial.println(WiFi.localIP());
+  Serial.print("or http://radio-lazienka.local");
 }
 
 void loop() {
@@ -1736,10 +1776,17 @@ void loop() {
   static unsigned long lightOffTime = 0;
   static bool waitingToTurnOn = false;
   static bool waitingToTurnOff = false;
+  static unsigned long lastSensorWarning = 0;
   
   if (millis() - lastRead > 1000) {
     lastRead = millis();
     brightness = readBH1750();
+    
+    // Ostrzeżenie o braku czujnika co 30 sekund
+    if (brightness == 0 && (millis() - lastSensorWarning > 30000)) {
+      lastSensorWarning = millis();
+      Serial.println("INFO: BH1750 not responding. Brightness = 0. Connect sensor for auto mode.");
+    }
     
     if (brightness > brightnessThreshold && !lightOn && !waitingToTurnOn) {
       waitingToTurnOn = true;
