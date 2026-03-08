@@ -84,13 +84,12 @@ int stationCount = 0;
 
 String urlEncode(String str) {
   String encoded = "";
-  char c;
   for (int i = 0; i < str.length(); i++) {
-    c = str.charAt(i);
+    unsigned char c = (unsigned char)str.charAt(i);
     if (c == ' ') {
       encoded += '+';
     } else if (isalnum(c)) {
-      encoded += c;
+      encoded += (char)c;
     } else {
       encoded += '%';
       if (c < 16) encoded += '0';
@@ -103,11 +102,11 @@ String urlEncode(String str) {
 // Flaga blokująca loop podczas TTS
 volatile bool isSpeaking = false;
 
-void speak(String text, int volume = 21) {
-  String ttsURL = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=pl&q=" + 
+void speak(String text, int volume = 21, String lang = "pl") {
+  String ttsURL = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=" + lang + "&q=" + 
                   urlEncode(text);
   
-  Serial.println("Speaking: " + text);
+  Serial.println("Speaking [" + lang + "]: " + text);
   
   isSpeaking = true;
   
@@ -134,45 +133,17 @@ void speak(String text, int volume = 21) {
 }
 
 void speakIP(String ip) {
-  // POLSKI - tylko zamiana kropek
+  // POLSKI
   String ipTextPL = ip;
   ipTextPL.replace(".", " kropka ");
-  
-  String messagePL = "Połączono. Adres I P: " + ipTextPL;
-  speak(messagePL, 5);
+  speak("Połączono. Adres I P: " + ipTextPL, 5, "pl");
   
   delay(1000);
   
-  // ANGIELSKI - tylko zamiana kropek
+  // ANGIELSKI
   String ipTextEN = ip;
   ipTextEN.replace(".", " dot ");
-  
-  String messageEN = "Connected. I P address: " + ipTextEN;
-  
-  String ttsURL = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=" + 
-                  urlEncode(messageEN);
-  
-  Serial.println("Speaking (EN): Connected. IP address: " + ip);
-  
-  isSpeaking = true;
-  
-  int previousVolume = currentVolume;
-  audio.setVolume(5);
-  audio.connecttohost(ttsURL.c_str());
-  
-  unsigned long startTime = millis();
-  unsigned long timeout = 10000;
-  
-  while (audio.isRunning() && (millis() - startTime < timeout)) {
-    audio.loop();
-    delay(10);
-  }
-  
-  audio.stopSong();
-  delay(500);
-  
-  audio.setVolume(previousVolume);
-  isSpeaking = false;
+  speak("Connected. I P address: " + ipTextEN, 5, "en");
   
   Serial.println("Speaking finished (both languages)");
 }
@@ -1000,7 +971,7 @@ const char service_html[] PROGMEM = R"rawliteral(
       </div>
       <div class="control">
         <label><span data-lang="mqtt-pass">Hasło (opcjonalnie)</span>:</label>
-        <input type="text" id="mqtt_pass" placeholder="">
+        <input type="password" id="mqtt_pass" placeholder="">
       </div>
       <div class="control">
         <label><span data-lang="mqtt-prefix">Prefix topików</span>:</label>
