@@ -39,6 +39,10 @@ unsigned long lastMQTTPublish = 0;
 
 #define MAX_STATIONS 20
 
+// Service menu authentication
+const char* SERVICE_USER = "admin";
+const char* SERVICE_PASS = "jolka";
+
 Audio audio;
 WebServer server(80);
 Preferences preferences;
@@ -80,13 +84,12 @@ int stationCount = 0;
 
 String urlEncode(String str) {
   String encoded = "";
-  char c;
   for (int i = 0; i < str.length(); i++) {
-    c = str.charAt(i);
+    unsigned char c = (unsigned char)str.charAt(i);
     if (c == ' ') {
       encoded += '+';
     } else if (isalnum(c)) {
-      encoded += c;
+      encoded += (char)c;
     } else {
       encoded += '%';
       if (c < 16) encoded += '0';
@@ -99,11 +102,11 @@ String urlEncode(String str) {
 // Flaga blokująca loop podczas TTS
 volatile bool isSpeaking = false;
 
-void speak(String text, int volume = 21) {
-  String ttsURL = "http://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=pl&q=" + 
+void speak(String text, int volume = 21, String lang = "pl") {
+  String ttsURL = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=" + lang + "&q=" + 
                   urlEncode(text);
   
-  Serial.println("Speaking: " + text);
+  Serial.println("Speaking [" + lang + "]: " + text);
   
   isSpeaking = true;
   
@@ -130,45 +133,17 @@ void speak(String text, int volume = 21) {
 }
 
 void speakIP(String ip) {
-  // POLSKI - tylko zamiana kropek
+  // POLSKI
   String ipTextPL = ip;
   ipTextPL.replace(".", " kropka ");
-  
-  String messagePL = "Połączono. Adres I P: " + ipTextPL;
-  speak(messagePL, 5);
+  speak("Połączono. Adres I P: " + ipTextPL, 5, "pl");
   
   delay(1000);
   
-  // ANGIELSKI - tylko zamiana kropek
+  // ANGIELSKI
   String ipTextEN = ip;
   ipTextEN.replace(".", " dot ");
-  
-  String messageEN = "Connected. I P address: " + ipTextEN;
-  
-  String ttsURL = "http://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=" + 
-                  urlEncode(messageEN);
-  
-  Serial.println("Speaking (EN): Connected. IP address: " + ip);
-  
-  isSpeaking = true;
-  
-  int previousVolume = currentVolume;
-  audio.setVolume(5);
-  audio.connecttohost(ttsURL.c_str());
-  
-  unsigned long startTime = millis();
-  unsigned long timeout = 10000;
-  
-  while (audio.isRunning() && (millis() - startTime < timeout)) {
-    audio.loop();
-    delay(10);
-  }
-  
-  audio.stopSong();
-  delay(500);
-  
-  audio.setVolume(previousVolume);
-  isSpeaking = false;
+  speak("Connected. I P address: " + ipTextEN, 5, "en");
   
   Serial.println("Speaking finished (both languages)");
 }
@@ -751,12 +726,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     };
 
     var openServiceMenu = function() {
-      var password = prompt(currentLang === 'pl' ? 'Podaj hasło serwisowe:' : 'Enter service password:');
-      if (password === 'jolka') {
-        window.location.href = '/service';
-      } else if (password !== null) {
-        alert(currentLang === 'pl' ? 'Nieprawidłowe hasło!' : 'Incorrect password!');
-      }
+      window.location.href = '/service';
     };
 
     var stationsData = [];
@@ -1001,7 +971,7 @@ const char service_html[] PROGMEM = R"rawliteral(
       </div>
       <div class="control">
         <label><span data-lang="mqtt-pass">Hasło (opcjonalnie)</span>:</label>
-        <input type="text" id="mqtt_pass" placeholder="">
+        <input type="password" id="mqtt_pass" placeholder="">
       </div>
       <div class="control">
         <label><span data-lang="mqtt-prefix">Prefix topików</span>:</label>
@@ -1293,10 +1263,16 @@ void handleRoot() {
 }
 
 void handleService() {
+  if (!server.authenticate(SERVICE_USER, SERVICE_PASS)) {
+    return server.requestAuthentication();
+  }
   server.send_P(200, "text/html", service_html);
 }
 
 void handleGetPins() {
+  if (!server.authenticate(SERVICE_USER, SERVICE_PASS)) {
+    return server.requestAuthentication();
+  }
   String json = "{";
   json += "\"sda\":" + String(SDA_PIN) + ",";
   json += "\"scl\":" + String(SCL_PIN) + ",";
@@ -1310,6 +1286,9 @@ void handleGetPins() {
 }
 
 void handleGetMQTT() {
+  if (!server.authenticate(SERVICE_USER, SERVICE_PASS)) {
+    return server.requestAuthentication();
+  }
   String json = "{";
   json += "\"server\":\"" + MQTT_SERVER + "\",";
   json += "\"port\":" + String(MQTT_PORT) + ",";
@@ -1330,6 +1309,9 @@ void handleWiFiInfo() {
 }
 
 void handleChangeWiFi() {
+  if (!server.authenticate(SERVICE_USER, SERVICE_PASS)) {
+    return server.requestAuthentication();
+  }
   server.send(200, "text/plain", "Starting WiFi Manager...");
   
   delay(1000);
@@ -1355,6 +1337,9 @@ void handleChangeWiFi() {
 }
 
 void handleSavePins() {
+  if (!server.authenticate(SERVICE_USER, SERVICE_PASS)) {
+    return server.requestAuthentication();
+  }
   if (server.hasArg("sda")) SDA_PIN = server.arg("sda").toInt();
   if (server.hasArg("scl")) SCL_PIN = server.arg("scl").toInt();
   if (server.hasArg("dout")) I2S_DOUT = server.arg("dout").toInt();
@@ -1372,6 +1357,9 @@ void handleSavePins() {
 }
 
 void handleSaveMQTT() {
+  if (!server.authenticate(SERVICE_USER, SERVICE_PASS)) {
+    return server.requestAuthentication();
+  }
   if (server.hasArg("server")) MQTT_SERVER = server.arg("server");
   if (server.hasArg("port")) MQTT_PORT = server.arg("port").toInt();
   if (server.hasArg("user")) MQTT_USER = server.arg("user");
@@ -1406,6 +1394,9 @@ void handleSetMode() {
 }
 
 void handleReset() {
+  if (!server.authenticate(SERVICE_USER, SERVICE_PASS)) {
+    return server.requestAuthentication();
+  }
   preferences.clear();
   
   SDA_PIN = 8;
@@ -1453,6 +1444,9 @@ void handleReset() {
 }
 
 void handleRestart() {
+  if (!server.authenticate(SERVICE_USER, SERVICE_PASS)) {
+    return server.requestAuthentication();
+  }
   server.send(200, "text/plain", "Restarting...");
   delay(1000);
   ESP.restart();
