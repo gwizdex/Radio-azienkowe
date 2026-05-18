@@ -9,12 +9,21 @@ Mamy wstępnie wpisane cztery przykładowe stacje radiowe, można je dowolnie mo
 Oprogramowanie daje możliwość ustawienie trybu pracy auto/manual. Wybór języka interfejsu, regulację głośności. 
 Wszystkie wartości są zapamiętywane i obowiązują po restarcie.
 
-Mamy również do dyspozycji tryb serwisowy, który daje nam możliwość edycji GPIO według własnych upodobań, dodanie czujnika DHT22 i możliwość współpracy z Mqtt.
+Mamy również do dyspozycji tryb serwisowy: edycja GPIO, czujnik DHT22, konfiguracja MQTT (Home Assistant), zmiana sieci WiFi oraz **zarządzanie stacjami radiowymi** (dodawanie i usuwanie — do 20 pozycji). Strona główna służy do codziennego sterowania; ustawienia zaawansowane są w menu serwisowym.
 
-Mamy również możliwość zmiany sieci WiFi. Dostęp do trybu serwisowego jest zabezpieczony Basic Auth: użytkownik `admin`, hasło `jolka`.
+Dostęp do menu serwisowego i powiązanych endpointów API jest zabezpieczony **Basic Auth**: użytkownik `admin`, hasło `jolka` (wartość domyślna w repozytorium — na własnym urządzeniu zmień w kodzie stałych `SERVICE_AUTH_USER` / `SERVICE_AUTH_PASS`). Hasło brokera MQTT **nie jest zwracane** do przeglądarki; przy zapisie puste pole hasła **nie nadpisuje** zapisanego wcześniej.
+
 Przy pierwszym uruchomieniu uruchamia się tryb AP, szukamy sieci o nazwie: "Radio_Config" i hasło: "password123"
 Po uzyskaniu połączenia otrzymamy komunikat głosowy o uzyskanym dresie IP w dwóch językach polskim i angielskim.
-Stacje radiowe można znależć tu: https://fmstream.org/
+Stacje radiowe można znaleźć tu: https://fmstream.org/
+
+### Zmiany (ostatnia aktualizacja firmware)
+
+- **Basic Auth** — logowanie HTTP do `/service` i endpointów konfiguracyjnych zamiast hasła wpisywanego w JavaScript.
+- **Bezpieczeństwo MQTT** — `/getmqtt` zwraca tylko flagę `hasPassword`, nie hasło w jawnej postaci.
+- **Zarządzanie stacjami** — dodawanie i usuwanie stacji przeniesione z panelu głównego do menu serwisowego.
+- **Walidacja po stronie urządzenia** — m.in. numery GPIO (0–48), port MQTT (1–65535), adres brokera (IPv4 lub nazwa DNS z kropką, np. `homeassistant.local`), progi i opóźnienia, godziny harmonogramu `HH:MM`, adresy strumieni `http://` / `https://`, głośność 0–100.
+- **Płynniejszy interfejs WWW** — podczas TTS, zmiany stacji, odczytu BH1750 i konfiguracji WiFi używane są opóźnienia nieblokujące (`serviceDelay`), dzięki czemu strona i odtwarzanie reagują w trakcie tych operacji.
 
 Ustawienia Arduino: 
 Board: "ESP32S3 Dev Module"
@@ -40,12 +49,21 @@ Four sample radio stations are pre-programmed, and these can be freely modified.
 The software allows you to set auto/manual operation modes, select the interface language, and adjust the volume.
 All values ​​are saved and remain valid after a reboot.
 
-We also have a service mode, which allows you to edit the GPIOs to your liking, add a DHT22 sensor, and enable MQTT compatibility.
+We also have a **service mode**: GPIO editing, DHT22 sensor, MQTT (Home Assistant), WiFi reconfiguration, and **radio station management** (add/remove — up to 20 stations). The main page is for everyday control; advanced settings are in the service menu.
 
-We can also change the WiFi network. Service mode is protected with Basic Auth: username `admin`, password `jolka`.
+Service mode and related API endpoints are protected with **Basic Auth**: username `admin`, password `jolka` (default in this repo — change `SERVICE_AUTH_USER` / `SERVICE_AUTH_PASS` in code on your own device). The MQTT broker password is **not sent** to the browser; leaving the password field empty when saving **does not overwrite** a previously stored password.
+
 When you first turn it on, it launches AP mode, searches for a network named "Radio_Config" and enters the password: "password123."
 Once connected, you'll receive a voice message announcing the IP address you've acquired, in both Polish and English.
 Radio stations can be found here: https://fmstream.org/
+
+### Changes (latest firmware update)
+
+- **Basic Auth** — HTTP login for `/service` and configuration endpoints instead of a JavaScript password prompt.
+- **MQTT security** — `/getmqtt` returns only a `hasPassword` flag, not the plaintext password.
+- **Station management** — add/remove stations moved from the main panel to the service menu.
+- **Server-side validation** — GPIO numbers (0–48), MQTT port (1–65535), broker host (IPv4 or dotted DNS name, e.g. `homeassistant.local`), thresholds and delays, schedule times `HH:MM`, stream URLs `http://` / `https://`, volume 0–100.
+- **More responsive web UI** — non-blocking delays (`serviceDelay`) during TTS, station changes, BH1750 reads, and WiFi setup so the page and playback stay responsive.
 
 Arduino settings:
 Board: "ESP32S3 Dev Module"
@@ -73,5 +91,4 @@ Core Debug Level: "None"
 <img width="828" height="987" alt="obraz" src="https://github.com/user-attachments/assets/6875e549-ed59-422d-b6a6-1d9eab9ef306" />
 <img width="838" height="832" alt="obraz" src="https://github.com/user-attachments/assets/92744017-2229-4d89-9c5d-f3fff51ccf1d" />
 <img width="827" height="1311" alt="obraz" src="https://github.com/user-attachments/assets/8b3cff2f-27d4-421e-8d70-e7de1060ec3a" />
-
 
