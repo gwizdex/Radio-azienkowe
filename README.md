@@ -11,7 +11,7 @@ Wszystkie wartości są zapamiętywane i obowiązują po restarcie.
 
 Mamy również do dyspozycji tryb serwisowy, który daje nam możliwość edycji GPIO według własnych upodobań, dodanie czujnika DHT22 i możliwość współpracy z Mqtt.
 
-Mamy również możliwość zmiany sieci WiFi. Do trybu serwisowego trzeba wpisać hasło: "jolka"
+Mamy również możliwość zmiany sieci WiFi. Dostęp do trybu serwisowego jest zabezpieczony Basic Auth: użytkownik `admin`, hasło `jolka`.
 Przy pierwszym uruchomieniu uruchamia się tryb AP, szukamy sieci o nazwie: "Radio_Config" i hasło: "password123"
 Po uzyskaniu połączenia otrzymamy komunikat głosowy o uzyskanym dresie IP w dwóch językach polskim i angielskim.
 Stacje radiowe można znależć tu: https://fmstream.org/
@@ -42,7 +42,7 @@ All values ​​are saved and remain valid after a reboot.
 
 We also have a service mode, which allows you to edit the GPIOs to your liking, add a DHT22 sensor, and enable MQTT compatibility.
 
-We can also change the WiFi network. To enter service mode, enter the password: "jolka."
+We can also change the WiFi network. Service mode is protected with Basic Auth: username `admin`, password `jolka`.
 When you first turn it on, it launches AP mode, searches for a network named "Radio_Config" and enters the password: "password123."
 Once connected, you'll receive a voice message announcing the IP address you've acquired, in both Polish and English.
 Radio stations can be found here: https://fmstream.org/

@@ -43,11 +43,15 @@ Audio audio;
 WebServer server(80);
 Preferences preferences;
 
+const char* SERVICE_AUTH_USER = "admin";
+const char* SERVICE_AUTH_PASS = "jolka";
+
 float brightness = 0;
 bool lightOn = false;
 bool manualMode = false;
 int currentVolume = 5;
 String currentStation = "Antyradio";
+bool webServerStarted = false;
 
 // DHT22 dane
 float temperature = 0.0;
@@ -99,6 +103,23 @@ String urlEncode(String str) {
 // Flaga blokująca loop podczas TTS
 volatile bool isSpeaking = false;
 
+void serviceDelay(unsigned long durationMs) {
+  unsigned long start = millis();
+  while (millis() - start < durationMs) {
+    if (webServerStarted) {
+      server.handleClient();
+    }
+
+    audio.loop();
+
+    if (MQTT_ENABLED && mqttClient.connected()) {
+      mqttClient.loop();
+    }
+
+    delay(1);
+  }
+}
+
 void speak(String text, int volume = 21) {
   String ttsURL = "http://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=pl&q=" + 
                   urlEncode(text);
@@ -115,12 +136,11 @@ void speak(String text, int volume = 21) {
   unsigned long timeout = text.length() * 100 + 5000;
   
   while (audio.isRunning() && (millis() - startTime < timeout)) {
-    audio.loop();
-    delay(10);
+    serviceDelay(10);
   }
   
   audio.stopSong();
-  delay(500);
+  serviceDelay(500);
   
   audio.setVolume(previousVolume);
   
@@ -137,7 +157,7 @@ void speakIP(String ip) {
   String messagePL = "Połączono. Adres I P: " + ipTextPL;
   speak(messagePL, 5);
   
-  delay(1000);
+  serviceDelay(1000);
   
   // ANGIELSKI - tylko zamiana kropek
   String ipTextEN = ip;
@@ -160,12 +180,11 @@ void speakIP(String ip) {
   unsigned long timeout = 10000;
   
   while (audio.isRunning() && (millis() - startTime < timeout)) {
-    audio.loop();
-    delay(10);
+    serviceDelay(10);
   }
   
   audio.stopSong();
-  delay(500);
+  serviceDelay(500);
   
   audio.setVolume(previousVolume);
   isSpeaking = false;
@@ -252,7 +271,7 @@ void mqttCallback(char* topic, uint8_t* payload, unsigned int length) {
     preferences.putString("station", currentStation);
     if (lightOn) {
       audio.stopSong();
-      delay(500);
+      serviceDelay(500);
       audio.connecttohost(getStationURL(currentStation).c_str());
       audio.setVolume(currentVolume);
     }
@@ -444,14 +463,14 @@ float readBH1750() {
     return 0;
   }
   
-  delay(120);
+  serviceDelay(120);
   
   Wire.requestFrom(BH1750_ADDR, 2);
   
   // Timeout na odczyt - nie blokuj loop()
   unsigned long timeout = millis();
   while (Wire.available() < 2 && (millis() - timeout < 100)) {
-    delay(1);
+    serviceDelay(1);
   }
   
   if (Wire.available() == 2) {
@@ -614,20 +633,6 @@ const char index_html[] PROGMEM = R"rawliteral(
       <button class="save" onclick="saveSettings()">💾 <span data-lang-key="save-settings">Zapisz ustawienia</span></button>
     </div>
 
-    <h2>📻 <span data-lang-key="manage-stations">Zarządzaj stacjami</span></h2>
-    <div id="stationList"></div>
-
-    <h2>➕ <span data-lang-key="add-station">Dodaj nową stację</span> <span data-lang-key="max-stations">(max 20 stacji)</span></h2>
-    <div class="control">
-      <label><span data-lang-key="station-name">Nazwa stacji</span>:</label>
-      <input type="text" id="newStationName" placeholder="np. Radio Nowa">
-    </div>
-    <div class="control">
-      <label><span data-lang-key="stream-url">URL strumienia</span>:</label>
-      <input type="text" id="newStationUrl" placeholder="http://...">
-    </div>
-    <button onclick="addStation()">➕ <span data-lang-key="add-btn">Dodaj stację</span></button>
-
     <div class="footer">
       <button class="service" onclick="openServiceMenu()">🔧 <span data-lang-key="service-menu">Menu serwisowe</span></button>
     </div>
@@ -726,14 +731,6 @@ const char index_html[] PROGMEM = R"rawliteral(
         }
       });
       
-      if(lang === 'pl') {
-        document.getElementById('newStationName').placeholder = 'np. Radio Nowa';
-        document.getElementById('newStationUrl').placeholder = 'http://...';
-      } else {
-        document.getElementById('newStationName').placeholder = 'e.g. New Radio';
-        document.getElementById('newStationUrl').placeholder = 'http://...';
-      }
-      
       updateData();
       updateStationList();
     };
@@ -751,12 +748,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     };
 
     var openServiceMenu = function() {
-      var password = prompt(currentLang === 'pl' ? 'Podaj hasło serwisowe:' : 'Enter service password:');
-      if (password === 'jolka') {
-        window.location.href = '/service';
-      } else if (password !== null) {
-        alert(currentLang === 'pl' ? 'Nieprawidłowe hasło!' : 'Incorrect password!');
-      }
+      window.location.href = '/service';
     };
 
     var stationsData = [];
@@ -771,15 +763,6 @@ const char index_html[] PROGMEM = R"rawliteral(
           opt.value = stationsData[i].name;
           opt.textContent = stationsData[i].name;
           sel.appendChild(opt);
-        }
-        var list = document.getElementById('stationList');
-        list.innerHTML = '';
-        var deleteText = translations[currentLang]['delete'];
-        for(var i=0; i<stationsData.length; i++){
-          var item = document.createElement('div');
-          item.className = 'station-item';
-          item.innerHTML = '<div class="station-info"><div class="station-name">'+stationsData[i].name+'</div><div class="station-url">'+stationsData[i].url+'</div></div><button class="btn-small delete" onclick="deleteStation('+i+')">🗑️ '+deleteText+'</button>';
-          list.appendChild(item);
         }
       });
     };
@@ -877,39 +860,6 @@ const char index_html[] PROGMEM = R"rawliteral(
       saveSettings();
     };
 
-    var addStation = function() {
-      var n = document.getElementById('newStationName').value.trim();
-      var u = document.getElementById('newStationUrl').value.trim();
-      if(!n || !u){ 
-        alert(currentLang==='pl' ? 'Wypełnij wszystkie pola!' : 'Fill in all fields!'); 
-        return; 
-      }
-      fetch('/addstation', {method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'name='+encodeURIComponent(n)+'&url='+encodeURIComponent(u)})
-      .then(function(r){return r.text();}).then(function(res){
-        if(res==='OK'){
-          document.getElementById('newStationName').value = '';
-          document.getElementById('newStationUrl').value = '';
-          updateStationList();
-          alert(currentLang==='pl' ? 'Stacja dodana!' : 'Station added!');
-        }else{
-          alert(currentLang==='pl' ? 'Błąd: '+res : 'Error: '+res);
-        }
-      });
-    };
-
-    var deleteStation = function(idx) {
-      var confirmMsg = currentLang==='pl' ? 'Czy na pewno usunąć tę stację?' : 'Are you sure you want to delete this station?';
-      if(!confirm(confirmMsg)) return;
-      fetch('/deletestation?index='+idx).then(function(r){return r.text();}).then(function(res){
-        if(res==='OK'){
-          updateStationList();
-          alert(currentLang==='pl' ? 'Stacja usunięta!' : 'Station deleted!');
-        }else{
-          alert(currentLang==='pl' ? 'Błąd: '+res : 'Error: '+res);
-        }
-      });
-    };
-    
     var savedLang = localStorage.getItem('lang') || 'pl';
     changeLang(savedLang);
     
@@ -951,6 +901,13 @@ const char service_html[] PROGMEM = R"rawliteral(
     .danger { background: #f8d7da; border-left: 4px solid #dc3545; padding: 15px; margin: 20px 0; }
     .info { background: #d1ecf1; border-left: 4px solid #17a2b8; padding: 15px; margin: 20px 0; }
     .setting-group { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0; }
+    .station-item { background: #fff; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #ddd; }
+    .station-info { flex-grow: 1; }
+    .station-name { font-weight: bold; color: #333; }
+    .station-url { font-size: 12px; color: #666; word-break: break-all; }
+    .btn-small { padding: 5px 15px; font-size: 14px; width: auto; margin: 0 5px; }
+    button.delete { background: #dc3545; }
+    button.delete:hover { background: #c82333; }
     .inline-control { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; margin: 10px 0; }
     .inline-control label { margin: 0; }
     .inline-control select, .inline-control input[type="number"] { width: 100px; }
@@ -1001,7 +958,8 @@ const char service_html[] PROGMEM = R"rawliteral(
       </div>
       <div class="control">
         <label><span data-lang="mqtt-pass">Hasło (opcjonalnie)</span>:</label>
-        <input type="text" id="mqtt_pass" placeholder="">
+        <input type="password" id="mqtt_pass" placeholder="">
+        <small id="mqtt_pass_status"></small>
       </div>
       <div class="control">
         <label><span data-lang="mqtt-prefix">Prefix topików</span>:</label>
@@ -1009,6 +967,20 @@ const char service_html[] PROGMEM = R"rawliteral(
       </div>
       <button onclick="saveMQTT()">💾 <span data-lang="save-mqtt">Zapisz MQTT</span></button>
     </div>
+
+    <h2>📻 <span data-lang="manage-stations">Zarządzaj stacjami</span></h2>
+    <div id="stationList"></div>
+
+    <h2>➕ <span data-lang="add-station">Dodaj nową stację</span> <span data-lang="max-stations">(max 20 stacji)</span></h2>
+    <div class="control">
+      <label><span data-lang="station-name">Nazwa stacji</span>:</label>
+      <input type="text" id="newStationName" placeholder="np. Radio Nowa">
+    </div>
+    <div class="control">
+      <label><span data-lang="stream-url">URL strumienia</span>:</label>
+      <input type="text" id="newStationUrl" placeholder="http://...">
+    </div>
+    <button onclick="addStation()">➕ <span data-lang="add-btn">Dodaj stację</span></button>
 
     <h2><span data-lang="dht-title">DHT22 - Temperatura i wilgotność</span></h2>
     <div class="setting-group">
@@ -1086,6 +1058,13 @@ const char service_html[] PROGMEM = R"rawliteral(
         'mqtt-pass': 'Hasło (opcjonalnie)',
         'mqtt-prefix': 'Prefix topików',
         'save-mqtt': 'Zapisz MQTT',
+        'manage-stations': 'Zarządzaj stacjami',
+        'add-station': 'Dodaj nową stację',
+        'max-stations': '(max 20 stacji)',
+        'station-name': 'Nazwa stacji',
+        'stream-url': 'URL strumienia',
+        'add-btn': 'Dodaj stację',
+        delete: 'Usuń',
         'dht-title': 'DHT22 - Temperatura i wilgotność',
         'dht-enable': 'Włącz czujnik DHT22',
         'dht-pin': 'DHT22 Pin (GPIO)',
@@ -1105,6 +1084,7 @@ const char service_html[] PROGMEM = R"rawliteral(
         back: 'Powrót',
         'saved-msg': 'Ustawienia zapisane! Uruchom restart, aby zmiany weszły w życie.',
         'mqtt-saved': 'MQTT zapisane!',
+        'mqtt-server-invalid': 'Niepoprawny adres brokera: podaj IPv4 lub nazwę z kropką (np. homeassistant.local).',
         'error-msg': 'Błąd zapisu!',
         'restart-confirm': 'Czy na pewno chcesz zrestartować urządzenie?',
         'restart-msg': 'Urządzenie się restartuje. Poczekaj 30 sekund i odśwież stronę.',
@@ -1129,6 +1109,13 @@ const char service_html[] PROGMEM = R"rawliteral(
         'mqtt-pass': 'Password (optional)',
         'mqtt-prefix': 'Topic prefix',
         'save-mqtt': 'Save MQTT',
+        'manage-stations': 'Manage stations',
+        'add-station': 'Add new station',
+        'max-stations': '(max 20 stations)',
+        'station-name': 'Station name',
+        'stream-url': 'Stream URL',
+        'add-btn': 'Add station',
+        delete: 'Delete',
         'dht-title': 'DHT22 - Temperature & Humidity',
         'dht-enable': 'Enable DHT22 sensor',
         'dht-pin': 'DHT22 Pin (GPIO)',
@@ -1148,6 +1135,7 @@ const char service_html[] PROGMEM = R"rawliteral(
         back: 'Back',
         'saved-msg': 'Settings saved! Restart the device for changes to take effect.',
         'mqtt-saved': 'MQTT saved!',
+        'mqtt-server-invalid': 'Invalid broker address: use IPv4 or a dotted hostname (e.g. homeassistant.local).',
         'error-msg': 'Save error!',
         'restart-confirm': 'Are you sure you want to restart the device?',
         'restart-msg': 'Device is restarting. Wait 30 seconds and refresh the page.',
@@ -1191,9 +1179,27 @@ const char service_html[] PROGMEM = R"rawliteral(
         document.getElementById('mqtt_server').value = d.server || '';
         document.getElementById('mqtt_port').value = d.port || 1883;
         document.getElementById('mqtt_user').value = d.user || '';
-        document.getElementById('mqtt_pass').value = d.pass || '';
+        document.getElementById('mqtt_pass').value = '';
+        document.getElementById('mqtt_pass').placeholder = d.hasPassword ? 'Pozostaw puste, aby nie zmieniać' : '';
+        document.getElementById('mqtt_pass_status').textContent = d.hasPassword ? 'Hasło MQTT jest zapisane.' : 'Hasło MQTT nie jest ustawione.';
         document.getElementById('mqtt_prefix').value = d.prefix || 'bathroom_radio';
         document.getElementById('mqtt_enabled').checked = d.enabled;
+      });
+    }
+
+    function loadServiceStations() {
+      fetch('/stations').then(function(r){return r.json();}).then(function(d){
+        var stationsData = d.stations;
+        var list = document.getElementById('stationList');
+        list.innerHTML = '';
+        var deleteText = translations[currentLang]['delete'];
+
+        for(var i=0; i<stationsData.length; i++){
+          var item = document.createElement('div');
+          item.className = 'station-item';
+          item.innerHTML = '<div class="station-info"><div class="station-name">'+stationsData[i].name+'</div><div class="station-url">'+stationsData[i].url+'</div></div><button class="btn-small delete" onclick="deleteStation('+i+')">🗑️ '+deleteText+'</button>';
+          list.appendChild(item);
+        }
       });
     }
 
@@ -1236,8 +1242,45 @@ const char service_html[] PROGMEM = R"rawliteral(
       .then(function(r){return r.text();}).then(function(res){
         if(res==='OK'){
           alert(translations[currentLang]['mqtt-saved']);
-        }else{
+        } else if (res==='INVALID_SERVER') {
+          alert(translations[currentLang]['mqtt-server-invalid']);
+        } else {
           alert(translations[currentLang]['error-msg']);
+        }
+      });
+    }
+
+    function addStation() {
+      var n = document.getElementById('newStationName').value.trim();
+      var u = document.getElementById('newStationUrl').value.trim();
+      if(!n || !u) {
+        alert(currentLang==='pl' ? 'Wypełnij wszystkie pola!' : 'Fill in all fields!');
+        return;
+      }
+
+      fetch('/addstation', {method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'name='+encodeURIComponent(n)+'&url='+encodeURIComponent(u)})
+      .then(function(r){return r.text();}).then(function(res){
+        if(res==='OK'){
+          document.getElementById('newStationName').value = '';
+          document.getElementById('newStationUrl').value = '';
+          loadServiceStations();
+          alert(currentLang==='pl' ? 'Stacja dodana!' : 'Station added!');
+        } else {
+          alert(currentLang==='pl' ? 'Błąd: '+res : 'Error: '+res);
+        }
+      });
+    }
+
+    function deleteStation(idx) {
+      var confirmMsg = currentLang==='pl' ? 'Czy na pewno usunąć tę stację?' : 'Are you sure you want to delete this station?';
+      if(!confirm(confirmMsg)) return;
+
+      fetch('/deletestation?index='+idx).then(function(r){return r.text();}).then(function(res){
+        if(res==='OK'){
+          loadServiceStations();
+          alert(currentLang==='pl' ? 'Stacja usunięta!' : 'Station deleted!');
+        } else {
+          alert(currentLang==='pl' ? 'Błąd: '+res : 'Error: '+res);
         }
       });
     }
@@ -1282,6 +1325,7 @@ const char service_html[] PROGMEM = R"rawliteral(
     loadPins();
     loadMQTT();
     loadWiFiInfo();
+    loadServiceStations();
     setInterval(loadWiFiInfo, 5000);
   </script>
 </body>
@@ -1292,11 +1336,210 @@ void handleRoot() {
   server.send_P(200, "text/html", index_html);
 }
 
+bool requireServiceAuth() {
+  if (server.authenticate(SERVICE_AUTH_USER, SERVICE_AUTH_PASS)) {
+    return true;
+  }
+
+  server.requestAuthentication(BASIC_AUTH, "Radio Lazienka Service");
+  return false;
+}
+
+bool isValidGPIO(int pin) {
+  return pin >= 0 && pin <= 48;
+}
+
+bool isValidMQTTPort(int port) {
+  return port >= 1 && port <= 65535;
+}
+
+bool isDigitString(String value) {
+  if (value.length() == 0) {
+    return false;
+  }
+
+  for (int i = 0; i < value.length(); i++) {
+    if (!isDigit(value.charAt(i))) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// Dotted IPv4 only (MQTT broker on ESP is typically IPv4 / hostname).
+bool isValidMQTTIPv4(String host) {
+  host.trim();
+  int numParts = 0;
+  String part = "";
+
+  for (unsigned int i = 0; i <= host.length(); i++) {
+    char c = (i < host.length()) ? host.charAt(i) : '.';
+
+    if (c == '.') {
+      if (numParts >= 4 || part.length() == 0 || part.length() > 3 ||
+          !isDigitString(part)) {
+        return false;
+      }
+
+      int v = part.toInt();
+
+      if (v < 0 || v > 255) {
+        return false;
+      }
+
+      if (part.length() > 1 && part.charAt(0) == '0') {
+        return false;
+      }
+
+      numParts++;
+      part = "";
+
+      continue;
+    }
+
+    if (!isDigit(c)) {
+      return false;
+    }
+
+    part += c;
+
+    if (part.length() > 3) {
+      return false;
+    }
+  }
+
+  return numParts == 4;
+}
+
+// Hostname/FQDN: labels a-z A-Z 0-9 hyphen, dots between labels (no trailing dot).
+bool isValidMQTTHostname(String host) {
+  host.trim();
+
+  if (host.length() == 0 || host.length() > 253) {
+    return false;
+  }
+
+  bool inLabel = false;
+  unsigned int labelStart = 0;
+
+  for (unsigned int i = 0; i < host.length(); i++) {
+    char c = host.charAt(i);
+
+    if (c == '.') {
+      if (!inLabel) {
+        return false;
+      }
+
+      unsigned int labelLen = i - labelStart;
+
+      if (labelLen == 0 || labelLen > 63) {
+        return false;
+      }
+
+      if (host.charAt(i - 1) == '-') {
+        return false;
+      }
+
+      inLabel = false;
+      labelStart = i + 1;
+      continue;
+    }
+
+    bool ok = ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+               (c >= '0' && c <= '9') || c == '-');
+
+    if (!ok) {
+      return false;
+    }
+
+    if (!inLabel) {
+      if (c == '-') {
+        return false;
+      }
+
+      inLabel = true;
+      labelStart = i;
+    }
+  }
+
+  if (!inLabel) {
+    return false;
+  }
+
+  unsigned int lastLen = host.length() - labelStart;
+
+  if (lastLen == 0 || lastLen > 63) {
+    return false;
+  }
+
+  if (host.charAt(host.length() - 1) == '-') {
+    return false;
+  }
+
+  return true;
+}
+
+// IPv4 lub nazwa DNS z przynajmniej jednym kropką (np. homeassistant.local).
+// Jedna etykieta bez kropek nie jest przyjmowana — odrzuca przypadkowe słowo.
+bool isValidMQTTBrokerHost(String host) {
+  host.trim();
+
+  if (host.length() == 0) {
+    return true;
+  }
+
+  if (isValidMQTTIPv4(host)) {
+    return true;
+  }
+
+  return host.indexOf('.') >= 0 && isValidMQTTHostname(host);
+}
+
+bool isValidStationUrl(String url) {
+  url.trim();
+  return url.startsWith("http://") || url.startsWith("https://");
+}
+
+bool parseTimeValue(String value, int &hour, int &minute) {
+  if (value.length() != 5 || value.charAt(2) != ':') {
+    return false;
+  }
+
+  if (!isDigit(value.charAt(0)) || !isDigit(value.charAt(1)) ||
+      !isDigit(value.charAt(3)) || !isDigit(value.charAt(4))) {
+    return false;
+  }
+
+  int parsedHour = value.substring(0, 2).toInt();
+  int parsedMinute = value.substring(3, 5).toInt();
+
+  if (parsedHour < 0 || parsedHour > 23 || parsedMinute < 0 || parsedMinute > 59) {
+    return false;
+  }
+
+  hour = parsedHour;
+  minute = parsedMinute;
+  return true;
+}
+
+bool stationExists(String name) {
+  for (int i = 0; i < stationCount; i++) {
+    if (stations[i].name == name) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void handleService() {
+  if (!requireServiceAuth()) return;
   server.send_P(200, "text/html", service_html);
 }
 
 void handleGetPins() {
+  if (!requireServiceAuth()) return;
   String json = "{";
   json += "\"sda\":" + String(SDA_PIN) + ",";
   json += "\"scl\":" + String(SCL_PIN) + ",";
@@ -1310,11 +1553,12 @@ void handleGetPins() {
 }
 
 void handleGetMQTT() {
+  if (!requireServiceAuth()) return;
   String json = "{";
   json += "\"server\":\"" + MQTT_SERVER + "\",";
   json += "\"port\":" + String(MQTT_PORT) + ",";
   json += "\"user\":\"" + MQTT_USER + "\",";
-  json += "\"pass\":\"" + MQTT_PASS + "\",";
+  json += "\"hasPassword\":" + String(MQTT_PASS.length() > 0 ? "true" : "false") + ",";
   json += "\"prefix\":\"" + MQTT_TOPIC_PREFIX + "\",";
   json += "\"enabled\":" + String(MQTT_ENABLED ? "true" : "false");
   json += "}";
@@ -1322,6 +1566,7 @@ void handleGetMQTT() {
 }
 
 void handleWiFiInfo() {
+  if (!requireServiceAuth()) return;
   String json = "{";
   json += "\"ssid\":\"" + WiFi.SSID() + "\",";
   json += "\"rssi\":" + String(WiFi.RSSI());
@@ -1330,37 +1575,65 @@ void handleWiFiInfo() {
 }
 
 void handleChangeWiFi() {
+  if (!requireServiceAuth()) return;
   server.send(200, "text/plain", "Starting WiFi Manager...");
   
-  delay(1000);
+  serviceDelay(1000);
   
   audio.stopSong();
   server.stop();
+  webServerStarted = false;
   
   WiFi.disconnect(true);
-  delay(1000);
+  serviceDelay(1000);
   
   WiFiManager wifiManager;
   wifiManager.setConfigPortalTimeout(300);
   
   if (!wifiManager.startConfigPortal("Radio_Config", "password123")) {
     Serial.println("Failed to connect, restarting...");
-    delay(3000);
+    serviceDelay(3000);
     ESP.restart();
   }
   
   Serial.println("WiFi reconfigured! Restarting...");
-  delay(1000);
+  serviceDelay(1000);
   ESP.restart();
 }
 
 void handleSavePins() {
-  if (server.hasArg("sda")) SDA_PIN = server.arg("sda").toInt();
-  if (server.hasArg("scl")) SCL_PIN = server.arg("scl").toInt();
-  if (server.hasArg("dout")) I2S_DOUT = server.arg("dout").toInt();
-  if (server.hasArg("bclk")) I2S_BCLK = server.arg("bclk").toInt();
-  if (server.hasArg("lrc")) I2S_LRC = server.arg("lrc").toInt();
-  if (server.hasArg("dht_pin")) DHT_PIN = server.arg("dht_pin").toInt();
+  if (!requireServiceAuth()) return;
+
+  if ((server.hasArg("sda") && !isDigitString(server.arg("sda"))) ||
+      (server.hasArg("scl") && !isDigitString(server.arg("scl"))) ||
+      (server.hasArg("dout") && !isDigitString(server.arg("dout"))) ||
+      (server.hasArg("bclk") && !isDigitString(server.arg("bclk"))) ||
+      (server.hasArg("lrc") && !isDigitString(server.arg("lrc"))) ||
+      (server.hasArg("dht_pin") && !isDigitString(server.arg("dht_pin")))) {
+    server.send(400, "text/plain", "INVALID_GPIO");
+    return;
+  }
+
+  int newSDA = server.hasArg("sda") ? server.arg("sda").toInt() : SDA_PIN;
+  int newSCL = server.hasArg("scl") ? server.arg("scl").toInt() : SCL_PIN;
+  int newDOUT = server.hasArg("dout") ? server.arg("dout").toInt() : I2S_DOUT;
+  int newBCLK = server.hasArg("bclk") ? server.arg("bclk").toInt() : I2S_BCLK;
+  int newLRC = server.hasArg("lrc") ? server.arg("lrc").toInt() : I2S_LRC;
+  int newDHT = server.hasArg("dht_pin") ? server.arg("dht_pin").toInt() : DHT_PIN;
+
+  if (!isValidGPIO(newSDA) || !isValidGPIO(newSCL) || !isValidGPIO(newDOUT) ||
+      !isValidGPIO(newBCLK) || !isValidGPIO(newLRC) || !isValidGPIO(newDHT)) {
+    server.send(400, "text/plain", "INVALID_GPIO");
+    return;
+  }
+
+  SDA_PIN = newSDA;
+  SCL_PIN = newSCL;
+  I2S_DOUT = newDOUT;
+  I2S_BCLK = newBCLK;
+  I2S_LRC = newLRC;
+  DHT_PIN = newDHT;
+
   if (server.hasArg("dht_en")) {
     DHT_ENABLED = (server.arg("dht_en") == "1");
     initDHT();
@@ -1372,10 +1645,35 @@ void handleSavePins() {
 }
 
 void handleSaveMQTT() {
-  if (server.hasArg("server")) MQTT_SERVER = server.arg("server");
-  if (server.hasArg("port")) MQTT_PORT = server.arg("port").toInt();
+  if (!requireServiceAuth()) return;
+  if (server.hasArg("port") && !isDigitString(server.arg("port"))) {
+    server.send(400, "text/plain", "INVALID_PORT");
+    return;
+  }
+
+  int newPort = server.hasArg("port") ? server.arg("port").toInt() : MQTT_PORT;
+
+  if (!isValidMQTTPort(newPort)) {
+    server.send(400, "text/plain", "INVALID_PORT");
+    return;
+  }
+
+  if (server.hasArg("server")) {
+    String trimmedServer = server.arg("server");
+
+    trimmedServer.trim();
+
+    if (!isValidMQTTBrokerHost(trimmedServer)) {
+      server.send(400, "text/plain", "INVALID_SERVER");
+      return;
+    }
+
+    MQTT_SERVER = trimmedServer;
+  }
+
+  MQTT_PORT = newPort;
   if (server.hasArg("user")) MQTT_USER = server.arg("user");
-  if (server.hasArg("pass")) MQTT_PASS = server.arg("pass");
+  if (server.hasArg("pass") && server.arg("pass").length() > 0) MQTT_PASS = server.arg("pass");
   if (server.hasArg("prefix")) MQTT_TOPIC_PREFIX = server.arg("prefix");
   if (server.hasArg("enabled")) {
     MQTT_ENABLED = (server.arg("enabled") == "1");
@@ -1406,6 +1704,7 @@ void handleSetMode() {
 }
 
 void handleReset() {
+  if (!requireServiceAuth()) return;
   preferences.clear();
   
   SDA_PIN = 8;
@@ -1453,6 +1752,7 @@ void handleReset() {
 }
 
 void handleRestart() {
+  if (!requireServiceAuth()) return;
   server.send(200, "text/plain", "Restarting...");
   delay(1000);
   ESP.restart();
@@ -1491,21 +1791,52 @@ void handleSettings() {
 
 void handleSaveSettings() {
   if (server.hasArg("threshold")) {
-    brightnessThreshold = server.arg("threshold").toFloat();
+    float newThreshold = server.arg("threshold").toFloat();
+    if (newThreshold < 1.0 || newThreshold > 1000.0) {
+      server.send(400, "text/plain", "INVALID_THRESHOLD");
+      return;
+    }
+    brightnessThreshold = newThreshold;
   }
   if (server.hasArg("delayOn")) {
-    delayOn = server.arg("delayOn").toInt();
+    if (!isDigitString(server.arg("delayOn"))) {
+      server.send(400, "text/plain", "INVALID_DELAY_ON");
+      return;
+    }
+
+    int newDelayOn = server.arg("delayOn").toInt();
+    if (newDelayOn < 0 || newDelayOn > 60) {
+      server.send(400, "text/plain", "INVALID_DELAY_ON");
+      return;
+    }
+    delayOn = newDelayOn;
   }
   if (server.hasArg("delayOff")) {
-    delayOff = server.arg("delayOff").toInt();
+    if (!isDigitString(server.arg("delayOff"))) {
+      server.send(400, "text/plain", "INVALID_DELAY_OFF");
+      return;
+    }
+
+    int newDelayOff = server.arg("delayOff").toInt();
+    if (newDelayOff < 0 || newDelayOff > 60) {
+      server.send(400, "text/plain", "INVALID_DELAY_OFF");
+      return;
+    }
+    delayOff = newDelayOff;
   }
   if (server.hasArg("schedStart")) {
     String start = server.arg("schedStart");
-    sscanf(start.c_str(), "%d:%d", &scheduleStartHour, &scheduleStartMinute);
+    if (!parseTimeValue(start, scheduleStartHour, scheduleStartMinute)) {
+      server.send(400, "text/plain", "INVALID_START_TIME");
+      return;
+    }
   }
   if (server.hasArg("schedEnd")) {
     String end = server.arg("schedEnd");
-    sscanf(end.c_str(), "%d:%d", &scheduleEndHour, &scheduleEndMinute);
+    if (!parseTimeValue(end, scheduleEndHour, scheduleEndMinute)) {
+      server.send(400, "text/plain", "INVALID_END_TIME");
+      return;
+    }
   }
   if (server.hasArg("schedEnabled")) {
     SCHEDULE_ENABLED = (server.arg("schedEnabled") == "1");
@@ -1547,6 +1878,8 @@ void handleStations() {
 }
 
 void handleAddStation() {
+  if (!requireServiceAuth()) return;
+
   if (stationCount >= MAX_STATIONS) {
     server.send(200, "text/plain", "MAX");
     return;
@@ -1555,6 +1888,13 @@ void handleAddStation() {
   if (server.hasArg("name") && server.hasArg("url")) {
     String name = server.arg("name");
     String url = server.arg("url");
+    name.trim();
+    url.trim();
+
+    if (name.length() == 0 || !isValidStationUrl(url)) {
+      server.send(400, "text/plain", "INVALID_STATION");
+      return;
+    }
     
     stations[stationCount].name = name;
     stations[stationCount].url = url;
@@ -1569,7 +1909,14 @@ void handleAddStation() {
 }
 
 void handleDeleteStation() {
+  if (!requireServiceAuth()) return;
+
   if (server.hasArg("index")) {
+    if (!isDigitString(server.arg("index"))) {
+      server.send(400, "text/plain", "INVALID_INDEX");
+      return;
+    }
+
     int index = server.arg("index").toInt();
     
     if (index >= 0 && index < stationCount) {
@@ -1591,12 +1938,18 @@ void handleDeleteStation() {
 
 void handleStation() {
   if (server.hasArg("name")) {
-    currentStation = server.arg("name");
+    String requestedStation = server.arg("name");
+    if (!stationExists(requestedStation)) {
+      server.send(400, "text/plain", "INVALID_STATION");
+      return;
+    }
+
+    currentStation = requestedStation;
     preferences.putString("station", currentStation);
     
     if (lightOn) {
       audio.stopSong();
-      delay(500);
+      serviceDelay(500);
       audio.connecttohost(getStationURL(currentStation).c_str());
       audio.setVolume(currentVolume);
     }
@@ -1606,7 +1959,18 @@ void handleStation() {
 
 void handleVolume() {
   if (server.hasArg("val")) {
-    currentVolume = server.arg("val").toInt();
+    if (!isDigitString(server.arg("val"))) {
+      server.send(400, "text/plain", "INVALID_VOLUME");
+      return;
+    }
+
+    int newVolume = server.arg("val").toInt();
+    if (newVolume < 0 || newVolume > 100) {
+      server.send(400, "text/plain", "INVALID_VOLUME");
+      return;
+    }
+
+    currentVolume = newVolume;
     preferences.putInt("volume", currentVolume);
     audio.setVolume(currentVolume);
   }
@@ -1726,6 +2090,7 @@ void setup() {
   server.on("/volume", handleVolume);
   
   server.begin();
+  webServerStarted = true;
   
   Serial.println("=== READY ===");
   Serial.print("Web interface: http://");
