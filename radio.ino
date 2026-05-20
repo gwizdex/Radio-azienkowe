@@ -9,6 +9,7 @@
 #include <DHT.h>
 #include <PubSubClient.h>
 #include <ESPmDNS.h>
+#include <ArduinoOTA.h>
 
 // Piny - konfigurowane przez użytkownika
 int SDA_PIN = 8;
@@ -82,6 +83,8 @@ int stationCount = 0;
 // FUNKCJE TTS (Text-to-Speech) - DWUJĘZYCZNE
 // ========================================
 
+const int TTS_VOLUME = 14;
+
 String urlEncode(String str) {
   String encoded = "";
   char c;
@@ -116,11 +119,13 @@ void serviceDelay(unsigned long durationMs) {
       mqttClient.loop();
     }
 
+    ArduinoOTA.handle();
+
     delay(1);
   }
 }
 
-void speak(String text, int volume = 21) {
+void speak(String text) {
   String ttsURL = "http://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=pl&q=" + 
                   urlEncode(text);
   
@@ -129,7 +134,7 @@ void speak(String text, int volume = 21) {
   isSpeaking = true;
   
   int previousVolume = currentVolume;
-  audio.setVolume(volume);
+  audio.setVolume(TTS_VOLUME);
   audio.connecttohost(ttsURL.c_str());
   
   unsigned long startTime = millis();
@@ -155,7 +160,7 @@ void speakIP(String ip) {
   ipTextPL.replace(".", " kropka ");
   
   String messagePL = "Połączono. Adres I P: " + ipTextPL;
-  speak(messagePL, 5);
+  speak(messagePL);
   
   serviceDelay(1000);
   
@@ -173,7 +178,7 @@ void speakIP(String ip) {
   isSpeaking = true;
   
   int previousVolume = currentVolume;
-  audio.setVolume(5);
+  audio.setVolume(TTS_VOLUME);
   audio.connecttohost(ttsURL.c_str());
   
   unsigned long startTime = millis();
@@ -339,6 +344,44 @@ void publishMQTT() {
     
     Serial.println("MQTT: Published state");
   }
+}
+
+void initOTA(bool mdnsActive) {
+  ArduinoOTA.setHostname("Radio-Lazienka");
+  ArduinoOTA.setPassword(SERVICE_AUTH_PASS);
+
+  ArduinoOTA.onStart([]() {
+    audio.stopSong();
+    lightOn = false;
+    Serial.println("OTA update started");
+  });
+
+  ArduinoOTA.onEnd([]() {
+    Serial.println("OTA update finished");
+  });
+
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("OTA progress: %u%%\n", (progress * 100) / total);
+  });
+
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("OTA error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+  });
+
+  ArduinoOTA.begin();
+  if (mdnsActive) {
+    MDNS.addService("arduino", "tcp", 3232);
+  }
+
+  Serial.println("OTA ready - upload via Arduino IDE network port");
+  Serial.print("  IP: ");
+  Serial.println(WiFi.localIP());
+  Serial.println("  Password: same as /service panel");
 }
 
 void initDHT() {
@@ -2029,7 +2072,7 @@ void setup() {
   if (!wifiManager.autoConnect("Radio_Config", "password123")) {
     Serial.println("Failed to connect, restarting...");
     
-    speak("Nie udało się połączyć z siecią. Urządzenie się restartuje.", 21);
+    speak("Nie udało się połączyć z siecią. Urządzenie się restartuje.");
     
     delay(3000);
     ESP.restart();
@@ -2044,13 +2087,16 @@ void setup() {
   Serial.println(WiFi.RSSI());
   
   // ⭐ mDNS
-  if (MDNS.begin("radio-lazienka")) {
+  bool mdnsActive = MDNS.begin("radio-lazienka");
+  if (mdnsActive) {
     Serial.println("mDNS started!");
     Serial.println("Access via: http://radio-lazienka.local");
     MDNS.addService("http", "tcp", 80);
   } else {
     Serial.println("Error starting mDNS");
   }
+
+  initOTA(mdnsActive);
   
   // 🎤🎤🎤 KOMUNIKAT GŁOSOWY Z ADRESEM IP! 🎤🎤🎤
   String ipAddress = WiFi.localIP().toString();
@@ -2099,6 +2145,7 @@ void setup() {
 }
 
 void loop() {
+  ArduinoOTA.handle();
   server.handleClient();
   
   // BLOKADA podczas mówienia TTS!

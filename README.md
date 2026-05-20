@@ -19,6 +19,8 @@ Stacje radiowe można znaleźć tu: https://fmstream.org/
 
 ### Zmiany (ostatnia aktualizacja firmware)
 
+- **Aktualizacja OTA (ArduinoOTA)** — po pierwszym wgraniu przez USB kolejne firmware można wgrywać przez WiFi z Arduino IDE (port sieciowy `Radio-Lazienka`, hasło jak w panelu serwisowym).
+- **Stała głośność komunikatów TTS** — komunikaty startowe (adres IP, błąd WiFi) odtwarzane są zawsze z głośności `TTS_VOLUME` (domyślnie 14/100), niezależnie od ustawionej głośności radia.
 - **Basic Auth** — logowanie HTTP do `/service` i endpointów konfiguracyjnych zamiast hasła wpisywanego w JavaScript.
 - **Bezpieczeństwo MQTT** — `/getmqtt` zwraca tylko flagę `hasPassword`, nie hasło w jawnej postaci.
 - **Zarządzanie stacjami** — dodawanie i usuwanie stacji przeniesione z panelu głównego do menu serwisowego.
@@ -59,6 +61,8 @@ Radio stations can be found here: https://fmstream.org/
 
 ### Changes (latest firmware update)
 
+- **OTA updates (ArduinoOTA)** — after the first USB flash, upload new firmware over WiFi from the Arduino IDE (network port `Radio-Lazienka`, password same as the service panel).
+- **Fixed TTS announcement volume** — startup voice messages (IP address, WiFi error) always play at `TTS_VOLUME` (default 14/100), independent of the radio volume setting.
 - **Basic Auth** — HTTP login for `/service` and configuration endpoints instead of a JavaScript password prompt.
 - **MQTT security** — `/getmqtt` returns only a `hasPassword` flag, not the plaintext password.
 - **Station management** — add/remove stations moved from the main panel to the service menu.
